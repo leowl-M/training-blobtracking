@@ -99,7 +99,8 @@ function bindUI(){
 function startWebcam(){
   cleanupMedia(); srcType='webcam'; camReady=false;
 
-  cam = createCapture({ video:{ facingMode:'user' }, audio:false }, ()=>{
+  cam = createCapture({ video:{ facingMode: "environment" }, audio:false }, ()=>{
+
     cam.elt.setAttribute('playsinline',''); cam.elt.muted=true; cam.elt.autoplay=true;
 
     const onReady = () => {
