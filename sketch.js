@@ -28,6 +28,7 @@ let mats = {}; let cvGuard = false;
 let pg; // off-screen buffer
 let drawBoxWeb={x:0,y:0,w:0,h:0}, drawBoxFile={x:0,y:0,w:0,h:0};
 let camNativeW=640, camNativeH=480;
+let useFrontCam = true;
 const FILE_LAYOUT_MODE = 'fitHeight'; // 'fitHeight' | 'fitWidth' | 'fit' | 'cover'
 
 // Export state
@@ -62,9 +63,11 @@ function setup(){
 function bindUI(){
   const $ = s => select(s);
   // sorgente
-  $('#btnWebcam').mousePressed(startWebcam);
-  $('#fileImg').elt.addEventListener('change', handleImage);
-  $('#fileVid').elt.addEventListener('change', handleVideo);
+ $('#btnWebcam').mousePressed(startWebcam);
+$('#btnSwitchCam').mousePressed(switchCamera); // <-- questo per cambiare camera
+$('#fileImg').elt.addEventListener('change', handleImage);
+$('#fileVid').elt.addEventListener('change', handleVideo);
+  
 
   // detect
   ui.method=$('#method'); ui.blur=$('#blur'); ui.thresh=$('#thresh');
@@ -99,19 +102,26 @@ function bindUI(){
 function startWebcam(){
   cleanupMedia(); srcType='webcam'; camReady=false;
 
-  cam = createCapture({ video:{ facingMode: "environment" }, audio:false }, ()=>{
-
-    cam.elt.setAttribute('playsinline',''); cam.elt.muted=true; cam.elt.autoplay=true;
+  cam = createCapture({ 
+    video: { facingMode: useFrontCam ? "user" : "environment" }, 
+    audio:false 
+  }, ()=>{
+    cam.elt.setAttribute('playsinline',''); 
+    cam.elt.muted = true; 
+    cam.elt.autoplay = true;
 
     const onReady = () => {
       if (!hasFrame(cam)) return;
       try { cam.elt.play(); } catch(_) {}
       camReady = true;
-      camNativeW = cam.elt.videoWidth; camNativeH = cam.elt.videoHeight;
-      const {w,h}=getCanvasSize();
-      resizeCanvas(w,h); pg.resizeCanvas(w,h);
+      camNativeW = cam.elt.videoWidth; 
+      camNativeH = cam.elt.videoHeight;
+      const {w,h} = getCanvasSize();
+      resizeCanvas(w,h); 
+      pg.resizeCanvas(w,h);
       drawBoxWeb = coverRect(camNativeW, camNativeH, w, h);
-      document.getElementById('infoSource').textContent = `Sorgente: Webcam (${camNativeW}×${camNativeH})`;
+      document.getElementById('infoSource').textContent = 
+        `Sorgente: Webcam (${camNativeW}×${camNativeH})`;
     };
 
     cam.elt.onloadedmetadata = onReady;
@@ -122,6 +132,12 @@ function startWebcam(){
   });
   cam.hide();
 }
+
+function switchCamera(){
+  useFrontCam = !useFrontCam;
+  startWebcam();
+}
+
 
 function handleImage(e){
   cleanupMedia(); srcType='image';
