@@ -28,7 +28,7 @@ let mats = {}; let cvGuard = false;
 let pg; // off-screen buffer
 let drawBoxWeb={x:0,y:0,w:0,h:0}, drawBoxFile={x:0,y:0,w:0,h:0};
 let camNativeW=640, camNativeH=480;
-const FILE_LAYOUT_MODE = 'fitHeight'; // puoi cambiare: 'fitHeight' | 'fitWidth' | 'fit' | 'cover'
+const FILE_LAYOUT_MODE = 'fitHeight'; // 'fitHeight' | 'fitWidth' | 'fit' | 'cover'
 
 // Export state
 let rec, recChunks=[], recStream=null;
@@ -39,7 +39,10 @@ function setup(){
   canvasW = size.w; canvasH = size.h;
   const c = createCanvas(canvasW, canvasH);
   c.parent('canvasWrap'); c.id('p5canvas');
-  pixelDensity(1);
+
+  // Retina-friendly senza esagerare
+  pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+
   colorMode(HSB,360,100,100,255);
   pg = createGraphics(canvasW, canvasH);
   document.getElementById('p5canvas').getContext('2d', { willReadFrequently: true });
@@ -306,18 +309,12 @@ function dashedLine(x1,y1,x2,y2,d=6,g=4){ const dx=x2-x1,dy=y2-y1,L=Math.hypot(d
 
 // Renders overlays on current canvas; if withSource=false, non ridisegna la sorgente (PNG trasparente)
 function renderOnce(withSource=true){
-  // ridisegna la sorgente nel canvas
   clear();
   if (withSource){
     if (srcType==='webcam' && hasFrame(cam)) image(cam, drawBoxWeb.x, drawBoxWeb.y, drawBoxWeb.w, drawBoxWeb.h);
     else if (srcType==='video' && hasFrame(vid)) image(vid, drawBoxFile.x, drawBoxFile.y, drawBoxFile.w, drawBoxFile.h);
-    else if (srcType==='image' && img) image(img, drawBoxFile.x, drawBoxFile.y, drawBoxFile.w, drawBoxFile.h);
+    else if (srcType==='image' && img) image(img, drawBoxFile.x, drawBoxFile.y, drawBoxFile.h, drawBoxFile.h);
   }
-  // poi ridisegno overlay chiamando solo la parte OpenCV del draw (riuso pg come sorgente)
-  // NB: riutilizziamo draw() pipeline con cv: per semplicità richiamiamo subito dopo che pg è allineato
-  // pg già contiene l'ultimo frame della sorgente → rifacciamo il blocco overlay veloce
-  // (qui rifattorizzare sarebbe tanta roba; riusiamo semplicemente draw() ma senza ridisegnare sorgente)
-  // In pratica: lasciamo che draw() nel prossimo tick sovrascriva, qui ci basta il canvas attuale per export.
 }
 
 // ---- PNG singolo ----
@@ -325,36 +322,26 @@ function exportPNG(){
   const scale = parseInt(ui.pngScale.value());
   const overlayOnly = ui.overlayOnly.elt.checked;
 
-  // 1) prepara un canvas temporaneo scaled
   const temp = document.createElement('canvas');
   temp.width = width * scale;
   temp.height = height * scale;
   const tctx = temp.getContext('2d');
 
-  // 2) render “on demand”: ridisegno su un clone del current canvas
-  // Per overlayOnly: ridisegno scena senza sorgente nel canvas, copio, poi ripristino
   const backup = document.createElement('canvas');
   backup.width = width; backup.height = height;
   backup.getContext('2d').drawImage(document.getElementById('p5canvas'), 0, 0);
 
-  if (overlayOnly){
-    // pulisco e ridisegno solo overlay (trucco: riuso il frame corrente, ma cancello sfondo)
-    clear();
-    // non ridisegno la sorgente: draw() al prossimo frame la rimetterà; intanto gli overlay restano
-  }
+  if (overlayOnly){ clear(); }
 
-  // 3) copia nel canvas scalato
   tctx.imageSmoothingEnabled = true;
   tctx.drawImage(document.getElementById('p5canvas'), 0, 0, temp.width, temp.height);
 
-  // 4) ripristina eventuale backup del canvas visivo
   if (overlayOnly){
     const ctx = document.getElementById('p5canvas').getContext('2d');
     ctx.clearRect(0,0,width,height);
     ctx.drawImage(backup,0,0);
   }
 
-  // 5) salva
   temp.toBlob(b=>{
     const a=document.createElement('a');
     a.href=URL.createObjectURL(b);
@@ -374,7 +361,6 @@ async function exportSequence(){
   const frames = secs * fps;
   const zip = new JSZip();
 
-  // temporanei per scaling e backup
   const temp = document.createElement('canvas');
   temp.width = width * scale; temp.height = height * scale;
   const tctx = temp.getContext('2d');
@@ -386,18 +372,15 @@ async function exportSequence(){
   const interval = 1000 / fps;
 
   const grab = () => new Promise(resolve=>{
-    // backup
     const bctx=backup.getContext('2d');
     bctx.clearRect(0,0,width,height);
     bctx.drawImage(document.getElementById('p5canvas'),0,0);
 
-    if (overlayOnly){ clear(); } // niente sorgente
+    if (overlayOnly){ clear(); }
 
-    // copia scalata
     tctx.clearRect(0,0,temp.width,temp.height);
     tctx.drawImage(document.getElementById('p5canvas'),0,0,temp.width,temp.height);
 
-    // ripristino
     if (overlayOnly){
       const ctx=document.getElementById('p5canvas').getContext('2d');
       ctx.clearRect(0,0,width,height);
