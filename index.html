@@ -1,77 +1,164 @@
 <!doctype html>
-<html lang="it">
+<html lang="it" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Blob Tracking – p5.js + OpenCV.js</title>
 
-  <!-- p5.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
-  <!-- OpenCV.js -->
-  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="cvOnLoad()"></script>
-  <!-- JSZip per sequenze ZIP -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- Tema + cvOnLoad PRIMA di caricare OpenCV -->
+  <script>
+    // OpenCV ready flag per draw()
+    let cvReady = false;
+    function cvOnLoad(){
+      if (typeof cv !== 'undefined') {
+        cv.onRuntimeInitialized = () => { cvReady = true; };
+      }
+    }
 
-  <link rel="stylesheet" href="style.css">
+    // toggle sidebar + tema
+    document.addEventListener('DOMContentLoaded', () => {
+      const sidebar = document.getElementById('sidebar');
+      document.getElementById('menuToggle')?.addEventListener('click', () => {
+        sidebar?.classList.toggle('open');
+        document.body.classList.toggle('no-scroll');
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 260);
+      });
+
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+      setTheme(saved || (prefersDark ? 'dark' : 'light'));
+      document.getElementById('themeToggle')?.addEventListener('click', () => {
+        setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+      });
+      function setTheme(t){ document.documentElement.setAttribute('data-theme', t); localStorage.setItem('theme', t); }
+    });
+  </script>
+
+  <!-- Librerie: p5 prima, poi OpenCV, poi JSZip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="cvOnLoad()"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+
+  <!-- CSS (assicurati che il nome sia questo file) -->
+  <link rel="stylesheet" href="style.css?v=1">
 </head>
 <body>
-  <!-- Topbar con hamburger -->
+  <!-- Topbar -->
   <header class="topbar">
-    <button id="menuToggle" aria-label="Apri/chiudi impostazioni">☰</button>
+    <button id="menuToggle" class="btn" aria-label="Apri/chiudi impostazioni">☰</button>
     <h1>Blob Tracking</h1>
+    <div class="topbar-right">
+      <button id="themeToggle" class="btn" aria-label="Cambia tema" title="Cambia tema">🌓</button>
+    </div>
   </header>
 
   <div id="app">
     <aside id="sidebar">
       <h1>Blob Tracking</h1>
-      <div class="sub">p5.js + OpenCV.js – sidebar sinistra, canvas destra</div>
+      <div class="sub">p5.js + OpenCV.js • tracking contorni</div>
 
       <details open>
         <summary>Sorgente</summary>
         <div class="section">
-          <div class="row"><button id="btnWebcam" class="primary">Webcam</button></div>
-          <div class="row"><button id="btnSwitchCam">Cambia camera</button></div>
-          <div class="row"><span class="label">Immagine</span><input id="fileImg" type="file" accept="image/*"></div>
-          <div class="row"><span class="label">Video</span><input id="fileVid" type="file" accept="video/*"></div>
+          <div class="row">
+            <button id="btnWebcam" class="primary">Webcam</button>
+            <button id="btnSwitchCam">Cambia camera</button>
+          </div>
+          <div class="row">
+            <label class="label" for="fileImg">Immagine</label>
+            <input id="fileImg" type="file" accept="image/*">
+          </div>
+          <div class="row">
+            <label class="label" for="fileVid">Video</label>
+            <input id="fileVid" type="file" accept="video/*">
+          </div>
         </div>
       </details>
 
       <details open>
         <summary>Rilevamento</summary>
         <div class="section">
-          <div class="row"><span class="label">Metodo</span>
-            <select id="method"><option value="threshold">Threshold</option><option value="canny">Canny</option></select>
+          <div class="row">
+            <label class="label" for="method">Metodo</label>
+            <select id="method">
+              <option value="threshold">Threshold</option>
+              <option value="canny">Canny</option>
+            </select>
           </div>
-          <div class="row" id="thLabel"><span class="label">Threshold</span><input id="thresh" type="range" min="0" max="255" step="1" value="100"></div>
-          <div class="row" id="cxLabel" style="display:none"><span class="label">Canny low</span><input id="cannyL" type="range" min="0" max="255" step="1" value="50"></div>
-          <div class="row" id="cyLabel" style="display:none"><span class="label">Canny high</span><input id="cannyH" type="range" min="0" max="255" step="1" value="150"></div>
-          <div class="row"><span class="label">Blur</span><input id="blur" type="range" min="0" max="25" step="1" value="5"></div>
-          <div class="row"><label><input id="approx" type="checkbox" checked> Semplifica contorni</label></div>
-          <div class="row"><label><input id="features" type="checkbox"> Box + centroidi</label></div>
-          <div class="row"><span class="label">Area minima</span><input id="minArea" type="range" min="0" max="50000" step="100" value="1500"><output id="minAreaVal">1500</output></div>
+
+          <div class="row" id="thLabel">
+            <label class="label" for="thresh">Threshold</label>
+            <input id="thresh" type="range" min="0" max="255" step="1" value="100">
+            <output id="threshVal">100</output>
+          </div>
+
+          <div class="row" id="cxLabel" style="display:none">
+            <label class="label" for="cannyL">Canny low</label>
+            <input id="cannyL" type="range" min="0" max="255" step="1" value="50">
+            <output id="cannyLVal">50</output>
+          </div>
+
+          <div class="row" id="cyLabel" style="display:none">
+            <label class="label" for="cannyH">Canny high</label>
+            <input id="cannyH" type="range" min="0" max="255" step="1" value="150">
+            <output id="cannyHVal">150</output>
+          </div>
+
+          <div class="row">
+            <label class="label" for="blur">Blur</label>
+            <input id="blur" type="range" min="0" max="25" step="1" value="5">
+            <output id="blurVal">5</output>
+          </div>
+
+          <div class="row">
+            <label><input id="approx" type="checkbox" checked> Semplifica contorni</label>
+            <label><input id="features" type="checkbox"> Box + centroidi</label>
+          </div>
+
+          <div class="row">
+            <label class="label" for="minArea">Area minima</label>
+            <input id="minArea" type="range" min="0" max="50000" step="100" value="1500">
+            <output id="minAreaVal">1500</output>
+          </div>
         </div>
       </details>
 
       <details open>
         <summary>Stile contorni</summary>
         <div class="section">
-          <div class="row"><span class="label">Spessore max</span><input id="maxStroke" type="range" min="1" max="12" step="1" value="6"><output id="maxStrokeVal">6</output></div>
-          <div class="row"><label><input id="useColormap" type="checkbox" checked> Usa colormap</label></div>
-          <div class="row"><span class="label">Colormap</span>
-            <select id="colormap"><option value="bluered">Blu → Rosso</option><option value="viridis">Viridis</option><option value="plasma">Plasma</option></select>
+          <div class="row">
+            <label class="label" for="maxStroke">Spessore max</label>
+            <input id="maxStroke" type="range" min="1" max="12" step="1" value="6">
+            <output id="maxStrokeVal">6</output>
           </div>
-          <div class="row"><span class="label">Colore fisso</span><input id="fixedColor" type="color" value="#00ff66"></div>
-          <div class="row"><span class="label">Opacità</span><input id="strokeAlpha" type="range" min="20" max="255" step="1" value="220"></div>
+          <div class="row"><label><input id="useColormap" type="checkbox" checked> Usa colormap</label></div>
+          <div class="row">
+            <label class="label" for="colormap">Colormap</label>
+            <select id="colormap">
+              <option value="bluered">Blu → Rosso</option>
+              <option value="viridis">Viridis</option>
+              <option value="plasma">Plasma</option>
+            </select>
+          </div>
+          <div class="row">
+            <label class="label" for="fixedColor">Colore fisso</label>
+            <input id="fixedColor" type="color" value="#00ff66">
+          </div>
+          <div class="row">
+            <label class="label" for="strokeAlpha">Opacità</label>
+            <input id="strokeAlpha" type="range" min="20" max="255" step="1" value="220">
+            <output id="strokeAlphaVal">220</output>
+          </div>
         </div>
       </details>
 
       <details>
         <summary>Colori UI</summary>
         <div class="section">
-          <div class="row"><span class="label">Box</span><input id="boxColor" type="color" value="#00d1ff"></div>
-          <div class="row"><span class="label">Centroide</span><input id="centroidColor" type="color" value="#00d1ff"></div>
-          <div class="row"><span class="label">Linea etichetta</span><input id="labelLineColor" type="color" value="#ffffff"></div>
-          <div class="row"><span class="label">Testo</span><input id="labelTextColor" type="color" value="#ffffff"></div>
+          <div class="row"><label class="label" for="boxColor">Box</label><input id="boxColor" type="color" value="#00d1ff"></div>
+          <div class="row"><label class="label" for="centroidColor">Centroide</label><input id="centroidColor" type="color" value="#00d1ff"></div>
+          <div class="row"><label class="label" for="labelLineColor">Linea etichetta</label><input id="labelLineColor" type="color" value="#ffffff"></div>
+          <div class="row"><label class="label" for="labelTextColor">Testo</label><input id="labelTextColor" type="color" value="#ffffff"></div>
           <div class="row"><label><input id="labelBg" type="checkbox"> Sfondo testo</label></div>
         </div>
       </details>
@@ -80,14 +167,40 @@
         <summary>Etichette & Metriche</summary>
         <div class="section">
           <div class="row"><label><input id="labels" type="checkbox"> Mostra etichette</label></div>
-          <div class="row"><span class="label">Metrica</span>
-            <select id="labelMetric"><option value="coords">Coordinate (x,y)</option><option value="index">Indice punto</option><option value="dist">Distanza dal centroide</option><option value="curv">Curvatura locale</option><option value="area">Area del blob</option></select>
+          <div class="row">
+            <label class="label" for="labelMetric">Metrica</label>
+            <select id="labelMetric">
+              <option value="coords">Coordinate (x,y)</option>
+              <option value="index">Indice punto</option>
+              <option value="dist">Distanza dal centroide</option>
+              <option value="curv">Curvatura locale</option>
+              <option value="area">Area del blob</option>
+            </select>
           </div>
-          <div class="row"><span class="label">Step punti</span><input id="labelStep" type="range" min="5" max="80" step="1" value="30"><output id="labelStepVal">30</output></div>
-          <div class="row" id="curvWinLabel"><span class="label">Finestra curv.</span><input id="curvWin" type="range" min="1" max="20" step="1" value="6"><output id="curvWinVal">6</output></div>
-          <div class="row"><span class="label">Font size</span><input id="fontSize" type="range" min="10" max="36" step="1" value="16"><output id="fontSizeVal">16</output></div>
-          <div class="row"><span class="label">Template</span><input id="labelTemplate" type="text" placeholder="{x}, {y}"></div>
-          <div class="row"><span class="label">Decimali</span><input id="decimals" type="range" min="0" max="4" step="1" value="1"><output id="decimalsVal">1</output></div>
+          <div class="row">
+            <label class="label" for="labelStep">Step punti</label>
+            <input id="labelStep" type="range" min="5" max="80" step="1" value="30">
+            <output id="labelStepVal">30</output>
+          </div>
+          <div class="row" id="curvWinLabel">
+            <label class="label" for="curvWin">Finestra curv.</label>
+            <input id="curvWin" type="range" min="1" max="20" step="1" value="6">
+            <output id="curvWinVal">6</output>
+          </div>
+          <div class="row">
+            <label class="label" for="fontSize">Font size</label>
+            <input id="fontSize" type="range" min="10" max="36" step="1" value="16">
+            <output id="fontSizeVal">16</output>
+          </div>
+          <div class="row">
+            <label class="label" for="labelTemplate">Template</label>
+            <input id="labelTemplate" type="text" placeholder="{x}, {y}">
+          </div>
+          <div class="row">
+            <label class="label" for="decimals">Decimali</label>
+            <input id="decimals" type="range" min="0" max="4" step="1" value="1">
+            <output id="decimalsVal">1</output>
+          </div>
           <div class="row"><span class="sub">Segnaposto: {x} {y} {index} {dist} {curv} {area}</span></div>
         </div>
       </details>
@@ -95,24 +208,28 @@
       <details open>
         <summary>Export</summary>
         <div class="section">
-          <div class="row"><span class="label">PNG scala</span>
+          <div class="row">
+            <label class="label" for="pngScale">PNG scala</label>
             <select id="pngScale"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
           </div>
           <div class="row"><label><input id="overlayOnly" type="checkbox"> Solo overlay (trasparente)</label></div>
           <div class="row"><button id="btnPng">📷 Salva PNG</button></div>
           <hr style="border:0;border-top:1px solid var(--line);width:100%">
-          <div class="row"><span class="label">Sequenza</span>
+          <div class="row">
+            <label class="label" for="seqSeconds">Sequenza</label>
             <input id="seqSeconds" type="number" min="1" value="3" style="width:70px"> s
-            <span class="label" style="min-width:auto;margin-left:8px">FPS</span>
+            <label class="label" for="seqFps" style="min-width:auto;margin-left:8px">FPS</label>
             <input id="seqFps" type="number" min="1" max="60" value="12" style="width:70px">
           </div>
-          <div class="row"><span class="label">Scala</span>
+          <div class="row">
+            <label class="label" for="seqScale">Scala</label>
             <select id="seqScale"><option value="1">1×</option><option value="2">2×</option></select>
           </div>
           <div class="row"><label><input id="seqOverlayOnly" type="checkbox"> Solo overlay</label></div>
           <div class="row"><button id="btnSeq">🗂️ Esporta sequenza (ZIP)</button></div>
           <hr style="border:0;border-top:1px solid var(--line);width:100%">
-          <div class="row"><span class="label">WebM FPS</span>
+          <div class="row">
+            <label class="label" for="webmFps">WebM FPS</label>
             <input id="webmFps" type="number" min="5" max="60" value="30" style="width:70px">
           </div>
           <div class="row"><button id="btnWebmStart">⏺️ Start WebM</button><button id="btnWebmStop" disabled>⏹️ Stop</button></div>
@@ -122,33 +239,20 @@
 
     <main id="stage">
       <div id="stageToolbar">
-        <div class="btnbar">
+        <div class="left"></div>
+        <div class="right">
           <span id="infoSource">Sorgente: —</span>
+          <span>•</span>
+          <span id="infoFps">FPS: —</span>
         </div>
-        <div class="right"><span id="infoFps">FPS: —</span></div>
       </div>
-      <div id="canvasWrap"></div>
+      <div id="canvasWrap" aria-label="Area canvas"></div>
     </main>
   </div>
 
-  <script>
-    let cvReady = false;
-    function cvOnLoad(){ if (typeof cv !== 'undefined') cv.onRuntimeInitialized = () => cvReady = true; }
-  </script>
+  <div id="toast" role="status" aria-live="polite"></div>
 
-  <!-- Toggle sidebar su mobile -->
-  <script>
-    (function () {
-      const btn = document.getElementById('menuToggle');
-      const sidebar = document.getElementById('sidebar');
-      if (!btn || !sidebar) return;
-      btn.addEventListener('click', () => {
-        sidebar.classList.toggle('open');
-        document.body.classList.toggle('no-scroll');
-      });
-    })();
-  </script>
-
-  <script src="sketch.js" defer></script>
+  <!-- Il tuo JS “funzionante” senza modifiche -->
+  <script src="sketch.js"></script>
 </body>
 </html>

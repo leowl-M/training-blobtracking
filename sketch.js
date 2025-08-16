@@ -1,10 +1,22 @@
 // ======== layout helpers ========
+// (NUOVO) rettangolo di rapporto "aspect" che sta dentro al box
+function fitRectInBox(aspect, boxW, boxH) {
+  let w = Math.floor(boxW);
+  let h = Math.floor(w / aspect);
+  if (h > boxH) { h = Math.floor(boxH); w = Math.floor(h * aspect); }
+  w = Math.max(200, w);
+  h = Math.max(200, h);
+  return { w, h };
+}
+
+// (MODIFICATA) ora restituisce una size 4:5 massima che entra nel wrapper
 function getCanvasSize() {
   const wrap = document.getElementById('canvasWrap');
   const cs = getComputedStyle(wrap);
-  const w = wrap.clientWidth  - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  const h = wrap.clientHeight - parseFloat(cs.paddingTop)  - parseFloat(cs.paddingBottom);
-  return { w: Math.max(320, w), h: Math.max(240, h) };
+  const boxW = wrap.clientWidth  - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const boxH = wrap.clientHeight - parseFloat(cs.paddingTop)  - parseFloat(cs.paddingBottom);
+  // 4:5  => aspect = width/height = 4/5
+  return fitRectInBox(4/5, boxW, boxH);
 }
 function fitRect(srcW, srcH, dstW, dstH){ const s=Math.min(dstW/srcW,dstH/srcH); const w=Math.round(srcW*s),h=Math.round(srcH*s); const x=Math.floor((dstW-w)/2),y=Math.floor((dstH-h)/2); return {x,y,w,h}; }
 function coverRect(srcW, srcH, dstW, dstH){ const s=Math.max(dstW/srcW,dstH/srcH); const w=Math.round(srcW*s),h=Math.round(srcH*s); const x=Math.floor((dstW-w)/2),y=Math.floor((dstH-h)/2); return {x,y,w,h}; }
