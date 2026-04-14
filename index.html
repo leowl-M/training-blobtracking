@@ -1,13 +1,24 @@
 <!doctype html>
-<html lang="it" data-theme="dark">
+<html lang="it">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Blob Tracking – p5.js + OpenCV.js</title>
+  <title>Blob Tracking</title>
 
-  <!-- Tema + cvOnLoad PRIMA di caricare OpenCV -->
+  <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    // OpenCV ready flag per draw()
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { neutral: { 850: '#1f1f1f', 950: '#0a0a0a' } }
+        }
+      }
+    }
+  </script>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
     let cvReady = false;
     function cvOnLoad(){
       if (typeof cv !== 'undefined') {
@@ -15,161 +26,170 @@
       }
     }
 
-    // toggle sidebar + tema
+    // Toggle Sidebar Mobile
     document.addEventListener('DOMContentLoaded', () => {
       const sidebar = document.getElementById('sidebar');
-      document.getElementById('menuToggle')?.addEventListener('click', () => {
-        sidebar?.classList.toggle('open');
-        document.body.classList.toggle('no-scroll');
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 260);
-      });
+      const overlay = document.getElementById('sidebarOverlay');
 
-      const saved = localStorage.getItem('theme');
-      const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-      setTheme(saved || (prefersDark ? 'dark' : 'light'));
-      document.getElementById('themeToggle')?.addEventListener('click', () => {
-        setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-      });
-      function setTheme(t){ document.documentElement.setAttribute('data-theme', t); localStorage.setItem('theme', t); }
+      function toggleMenu() {
+        sidebar?.classList.toggle('open');
+        overlay?.classList.toggle('active');
+        document.body.classList.toggle('overflow-hidden');
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
+      }
+
+      document.getElementById('menuToggle')?.addEventListener('click', toggleMenu);
+      overlay?.addEventListener('click', toggleMenu);
     });
   </script>
 
-  <!-- Librerie: p5 prima, poi OpenCV, poi JSZip -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
   <script async src="https://docs.opencv.org/4.x/opencv.js" onload="cvOnLoad()"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
 
-  <!-- CSS (assicurati che il nome sia questo file) -->
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <!-- Topbar -->
-  <header class="topbar">
-    <button id="menuToggle" class="btn" aria-label="Apri/chiudi impostazioni">☰</button>
-    <h1>Blob Tracking</h1>
-    <div class="topbar-right">
-      <button id="themeToggle" class="btn" aria-label="Cambia tema" title="Cambia tema">🌓</button>
+<body class="bg-neutral-950 text-neutral-200 overflow-hidden text-sm font-sans flex flex-col md:flex-row h-screen antialiased selection:bg-neutral-700">
+
+  <div id="sidebarOverlay" class="sidebar-overlay md:hidden"></div>
+
+  <aside id="sidebar" class="w-80 flex-shrink-0 bg-[#171717] border-r border-neutral-800 flex flex-col h-full z-50 custom-scrollbar overflow-y-auto">
+    <div class="md:hidden flex items-center justify-between p-4 border-b border-neutral-800">
+      <h1 class="font-semibold">Impostazioni</h1>
+      <button id="menuToggle" class="p-2 hover:bg-neutral-800 rounded-md"><i data-lucide="x" class="w-5 h-5"></i></button>
     </div>
-  </header>
 
-  <div id="app">
-    <aside id="sidebar">
-      <h1>Blob Tracking</h1>
-      <div class="sub">p5.js + OpenCV.js • tracking contorni</div>
+    <div class="hidden md:block p-5 border-b border-neutral-800">
+      <h1 class="font-bold text-base">Blob Tracking</h1>
+    </div>
 
-      <details open>
-        <summary>Sorgente</summary>
-        <div class="section">
-          <div class="row">
-            <button id="btnWebcam" class="primary">Webcam</button>
-            <button id="btnSwitchCam">Cambia camera</button>
+    <div class="flex-1 pb-10">
+      <details class="group border-b border-neutral-800" open>
+        <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+          <span>Sorgente</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+        </summary>
+        <div class="px-5 pb-4 space-y-4">
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnWebcam" class="flex items-center justify-center gap-2 bg-neutral-200 text-black py-2 px-3 rounded-md font-medium hover:bg-white transition-colors"><i data-lucide="video" class="w-4 h-4"></i> Webcam</button>
+            <button id="btnSwitchCam" class="flex items-center justify-center gap-2 border border-neutral-700 py-2 px-3 rounded-md hover:bg-neutral-800 transition-colors"><i data-lucide="switch-camera" class="w-4 h-4"></i> Cambia</button>
           </div>
-          <div class="row">
-            <label class="label" for="fileImg">Immagine</label>
-            <input id="fileImg" type="file" accept="image/*">
+          <div class="space-y-1">
+            <label class="block text-xs text-neutral-500" for="fileImg">Immagine</label>
+            <input id="fileImg" type="file" accept="image/*" class="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-neutral-800 file:text-neutral-300 hover:file:bg-neutral-700 cursor-pointer">
           </div>
-          <div class="row">
-            <label class="label" for="fileVid">Video</label>
-            <input id="fileVid" type="file" accept="video/*">
+          <div class="space-y-1">
+            <label class="block text-xs text-neutral-500" for="fileVid">Video</label>
+            <input id="fileVid" type="file" accept="video/*" class="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-neutral-800 file:text-neutral-300 hover:file:bg-neutral-700 cursor-pointer">
           </div>
         </div>
       </details>
 
-      <details open>
-        <summary>Rilevamento</summary>
-        <div class="section">
-          <div class="row">
-            <label class="label" for="method">Metodo</label>
-            <select id="method">
+      <details class="group border-b border-neutral-800" open>
+        <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+          <span>Rilevamento</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+        </summary>
+        <div class="px-5 pb-4 space-y-4">
+          <div class="space-y-1">
+            <label class="block text-xs text-neutral-500" for="method">Metodo</label>
+            <select id="method" class="w-full bg-transparent border border-neutral-700 rounded-md py-1.5 px-2 text-sm focus:border-neutral-500 transition-colors">
               <option value="threshold">Threshold</option>
               <option value="canny">Canny</option>
             </select>
           </div>
 
-          <div class="row" id="thLabel">
-            <label class="label" for="thresh">Threshold</label>
-            <input id="thresh" type="range" min="0" max="255" step="1" value="100">
-            <output id="threshVal">100</output>
+          <div id="thLabel" class="space-y-1">
+            <div class="flex justify-between text-xs"><label for="thresh" class="text-neutral-500">Threshold</label><output id="threshVal" class="font-mono">100</output></div>
+            <input id="thresh" type="range" min="0" max="255" step="1" value="100" class="w-full">
           </div>
 
-          <div class="row" id="cxLabel" style="display:none">
-            <label class="label" for="cannyL">Canny low</label>
-            <input id="cannyL" type="range" min="0" max="255" step="1" value="50">
-            <output id="cannyLVal">50</output>
+          <div id="cxLabel" class="space-y-1" style="display:none">
+            <div class="flex justify-between text-xs"><label for="cannyL" class="text-neutral-500">Canny low</label><output id="cannyLVal" class="font-mono">50</output></div>
+            <input id="cannyL" type="range" min="0" max="255" step="1" value="50" class="w-full">
           </div>
 
-          <div class="row" id="cyLabel" style="display:none">
-            <label class="label" for="cannyH">Canny high</label>
-            <input id="cannyH" type="range" min="0" max="255" step="1" value="150">
-            <output id="cannyHVal">150</output>
+          <div id="cyLabel" class="space-y-1" style="display:none">
+            <div class="flex justify-between text-xs"><label for="cannyH" class="text-neutral-500">Canny high</label><output id="cannyHVal" class="font-mono">150</output></div>
+            <input id="cannyH" type="range" min="0" max="255" step="1" value="150" class="w-full">
           </div>
 
-          <div class="row">
-            <label class="label" for="blur">Blur</label>
-            <input id="blur" type="range" min="0" max="25" step="1" value="5">
-            <output id="blurVal">5</output>
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs"><label for="blur" class="text-neutral-500">Blur</label><output id="blurVal" class="font-mono">5</output></div>
+            <input id="blur" type="range" min="0" max="25" step="1" value="5" class="w-full">
           </div>
 
-          <div class="row">
-            <label><input id="approx" type="checkbox" checked> Semplifica contorni</label>
-            <label><input id="features" type="checkbox"> Box + centroidi</label>
+          <div class="space-y-2 pt-1">
+            <label class="flex items-center gap-2 cursor-pointer"><input id="approx" type="checkbox" checked class="w-4 h-4 accent-neutral-400"> <span>Semplifica contorni</span></label>
+            <label class="flex items-center gap-2 cursor-pointer"><input id="features" type="checkbox" class="w-4 h-4 accent-neutral-400"> <span>Box + centroidi</span></label>
           </div>
 
-          <div class="row">
-            <label class="label" for="minArea">Area minima</label>
-            <input id="minArea" type="range" min="0" max="50000" step="100" value="1500">
-            <output id="minAreaVal">1500</output>
+          <div class="space-y-1 pt-1">
+            <div class="flex justify-between text-xs"><label for="minArea" class="text-neutral-500">Area minima</label><output id="minAreaVal" class="font-mono">1500</output></div>
+            <input id="minArea" type="range" min="0" max="50000" step="100" value="1500" class="w-full">
           </div>
         </div>
       </details>
 
-      <details open>
-        <summary>Stile contorni</summary>
-        <div class="section">
-          <div class="row">
-            <label class="label" for="maxStroke">Spessore max</label>
-            <input id="maxStroke" type="range" min="1" max="12" step="1" value="6">
-            <output id="maxStrokeVal">6</output>
+      <details class="group border-b border-neutral-800" open>
+        <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+          <span>Stile contorni</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+        </summary>
+        <div class="px-5 pb-4 space-y-4">
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs"><label for="maxStroke" class="text-neutral-500">Spessore max</label><output id="maxStrokeVal" class="font-mono">6</output></div>
+            <input id="maxStroke" type="range" min="1" max="12" step="1" value="6" class="w-full">
           </div>
-          <div class="row"><label><input id="useColormap" type="checkbox" checked> Usa colormap</label></div>
-          <div class="row">
-            <label class="label" for="colormap">Colormap</label>
-            <select id="colormap">
+          
+          <label class="flex items-center gap-2 cursor-pointer"><input id="useColormap" type="checkbox" checked class="w-4 h-4 accent-neutral-400"> <span>Usa colormap</span></label>
+          
+          <div class="space-y-1">
+            <label class="block text-xs text-neutral-500" for="colormap">Colormap</label>
+            <select id="colormap" class="w-full bg-transparent border border-neutral-700 rounded-md py-1.5 px-2 text-sm focus:border-neutral-500 transition-colors">
               <option value="bluered">Blu → Rosso</option>
               <option value="viridis">Viridis</option>
               <option value="plasma">Plasma</option>
             </select>
           </div>
-          <div class="row">
-            <label class="label" for="fixedColor">Colore fisso</label>
-            <input id="fixedColor" type="color" value="#00ff66">
+
+          <div class="flex items-center justify-between">
+            <label class="text-sm" for="fixedColor">Colore fisso</label>
+            <input id="fixedColor" type="color" value="#00ff66" class="color-input">
           </div>
-          <div class="row">
-            <label class="label" for="strokeAlpha">Opacità</label>
-            <input id="strokeAlpha" type="range" min="20" max="255" step="1" value="220">
-            <output id="strokeAlphaVal">220</output>
+
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs"><label for="strokeAlpha" class="text-neutral-500">Opacità</label><output id="strokeAlphaVal" class="font-mono">220</output></div>
+            <input id="strokeAlpha" type="range" min="20" max="255" step="1" value="220" class="w-full">
           </div>
         </div>
       </details>
 
-      <details>
-        <summary>Colori UI</summary>
-        <div class="section">
-          <div class="row"><label class="label" for="boxColor">Box</label><input id="boxColor" type="color" value="#00d1ff"></div>
-          <div class="row"><label class="label" for="centroidColor">Centroide</label><input id="centroidColor" type="color" value="#00d1ff"></div>
-          <div class="row"><label class="label" for="labelLineColor">Linea etichetta</label><input id="labelLineColor" type="color" value="#ffffff"></div>
-          <div class="row"><label class="label" for="labelTextColor">Testo</label><input id="labelTextColor" type="color" value="#ffffff"></div>
-          <div class="row"><label><input id="labelBg" type="checkbox"> Sfondo testo</label></div>
+      <details class="group border-b border-neutral-800">
+        <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+          <span>Colori UI</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+        </summary>
+        <div class="px-5 pb-4 space-y-3">
+          <div class="flex items-center justify-between"><label for="boxColor">Box</label><input id="boxColor" type="color" value="#00d1ff" class="color-input"></div>
+          <div class="flex items-center justify-between"><label for="centroidColor">Centroide</label><input id="centroidColor" type="color" value="#00d1ff" class="color-input"></div>
+          <div class="flex items-center justify-between"><label for="labelLineColor">Linea etichetta</label><input id="labelLineColor" type="color" value="#ffffff" class="color-input"></div>
+          <div class="flex items-center justify-between"><label for="labelTextColor">Testo</label><input id="labelTextColor" type="color" value="#ffffff" class="color-input"></div>
+          <label class="flex items-center gap-2 cursor-pointer pt-2"><input id="labelBg" type="checkbox" class="w-4 h-4 accent-neutral-400"> <span>Sfondo testo</span></label>
         </div>
       </details>
 
-      <details>
-        <summary>Etichette & Metriche</summary>
-        <div class="section">
-          <div class="row"><label><input id="labels" type="checkbox"> Mostra etichette</label></div>
-          <div class="row">
-            <label class="label" for="labelMetric">Metrica</label>
-            <select id="labelMetric">
+      <details class="group border-b border-neutral-800">
+        <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+          <span>Etichette & Metriche</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+        </summary>
+        <div class="px-5 pb-4 space-y-4">
+          <label class="flex items-center gap-2 cursor-pointer"><input id="labels" type="checkbox" class="w-4 h-4 accent-neutral-400"> <span>Mostra etichette</span></label>
+          
+          <div class="space-y-1">
+            <label class="block text-xs text-neutral-500" for="labelMetric">Metrica principale</label>
+            <select id="labelMetric" class="w-full bg-transparent border border-neutral-700 rounded-md py-1.5 px-2 text-sm focus:border-neutral-500 transition-colors">
               <option value="coords">Coordinate (x,y)</option>
               <option value="index">Indice punto</option>
               <option value="dist">Distanza dal centroide</option>
@@ -177,82 +197,118 @@
               <option value="area">Area del blob</option>
             </select>
           </div>
-          <div class="row">
-            <label class="label" for="labelStep">Step punti</label>
-            <input id="labelStep" type="range" min="5" max="80" step="1" value="30">
-            <output id="labelStepVal">30</output>
+
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs"><label for="labelStep" class="text-neutral-500">Step punti</label><output id="labelStepVal" class="font-mono">30</output></div>
+            <input id="labelStep" type="range" min="5" max="80" step="1" value="30" class="w-full">
           </div>
-          <div class="row" id="curvWinLabel">
-            <label class="label" for="curvWin">Finestra curv.</label>
-            <input id="curvWin" type="range" min="1" max="20" step="1" value="6">
-            <output id="curvWinVal">6</output>
+
+          <div id="curvWinLabel" class="space-y-1">
+            <div class="flex justify-between text-xs"><label for="curvWin" class="text-neutral-500">Finestra curvatura</label><output id="curvWinVal" class="font-mono">6</output></div>
+            <input id="curvWin" type="range" min="1" max="20" step="1" value="6" class="w-full">
           </div>
-          <div class="row">
-            <label class="label" for="fontSize">Font size</label>
-            <input id="fontSize" type="range" min="10" max="36" step="1" value="16">
-            <output id="fontSizeVal">16</output>
+
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs"><label for="fontSize" class="text-neutral-500">Font size</label><output id="fontSizeVal" class="font-mono">16</output></div>
+            <input id="fontSize" type="range" min="10" max="36" step="1" value="16" class="w-full">
           </div>
-          <div class="row">
-            <label class="label" for="labelTemplate">Template</label>
-            <input id="labelTemplate" type="text" placeholder="{x}, {y}">
+
+          <div class="space-y-1">
+            <label class="block text-xs text-neutral-500" for="labelTemplate">Template testo</label>
+            <input id="labelTemplate" type="text" placeholder="{x}, {y}" class="w-full bg-transparent border border-neutral-700 rounded-md py-1.5 px-2 text-sm focus:border-neutral-500 transition-colors">
+            <div class="text-[11px] text-neutral-500 mt-1">Variabili: {x} {y} {index} {dist} {curv} {area}</div>
           </div>
-          <div class="row">
-            <label class="label" for="decimals">Decimali</label>
-            <input id="decimals" type="range" min="0" max="4" step="1" value="1">
-            <output id="decimalsVal">1</output>
+
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs"><label for="decimals" class="text-neutral-500">Decimali</label><output id="decimalsVal" class="font-mono">1</output></div>
+            <input id="decimals" type="range" min="0" max="4" step="1" value="1" class="w-full">
           </div>
-          <div class="row"><span class="sub">Segnaposto: {x} {y} {index} {dist} {curv} {area}</span></div>
         </div>
       </details>
 
-      <details open>
-        <summary>Export</summary>
-        <div class="section">
-          <div class="row">
-            <label class="label" for="pngScale">PNG scala</label>
-            <select id="pngScale"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <details class="group" open>
+        <summary class="flex justify-between items-center px-5 py-3.5 cursor-pointer select-none font-medium hover:bg-neutral-800/50 transition-colors">
+          <span>Esporta</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500 transition-transform group-open:-rotate-180"></i>
+        </summary>
+        <div class="px-5 pb-4 space-y-5">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <label for="pngScale" class="text-sm">Scala immagine</label>
+              <select id="pngScale" class="bg-transparent border border-neutral-700 rounded-md py-1 px-2 text-sm focus:border-neutral-500"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer"><input id="overlayOnly" type="checkbox" class="w-4 h-4 accent-neutral-400"> <span>Sfondo trasparente (solo overlay)</span></label>
+            <button id="btnPng" class="w-full flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 py-2 rounded-md transition-colors"><i data-lucide="image" class="w-4 h-4"></i> Salva Immagine</button>
           </div>
-          <div class="row"><label><input id="overlayOnly" type="checkbox"> Solo overlay (trasparente)</label></div>
-          <div class="row"><button id="btnPng">📷 Salva PNG</button></div>
-          <hr style="border:0;border-top:1px solid var(--line);width:100%">
-          <div class="row">
-            <label class="label" for="seqSeconds">Sequenza</label>
-            <input id="seqSeconds" type="number" min="1" value="3" style="width:70px"> s
-            <label class="label" for="seqFps" style="min-width:auto;margin-left:8px">FPS</label>
-            <input id="seqFps" type="number" min="1" max="60" value="12" style="width:70px">
+
+          <hr class="border-neutral-800">
+
+          <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs text-neutral-500 mb-1" for="seqSeconds">Durata (s)</label>
+                <input id="seqSeconds" type="number" min="1" value="3" class="w-full bg-transparent border border-neutral-700 rounded-md py-1.5 px-2 text-sm focus:border-neutral-500">
+              </div>
+              <div>
+                <label class="block text-xs text-neutral-500 mb-1" for="seqFps">FPS Sequenza</label>
+                <input id="seqFps" type="number" min="1" max="60" value="12" class="w-full bg-transparent border border-neutral-700 rounded-md py-1.5 px-2 text-sm focus:border-neutral-500">
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <label for="seqScale" class="text-sm">Scala export</label>
+              <select id="seqScale" class="bg-transparent border border-neutral-700 rounded-md py-1 px-2 text-sm focus:border-neutral-500"><option value="1">1×</option><option value="2">2×</option></select>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer"><input id="seqOverlayOnly" type="checkbox" class="w-4 h-4 accent-neutral-400"> <span>Sfondo trasparente</span></label>
+            <button id="btnSeq" class="w-full flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 py-2 rounded-md transition-colors"><i data-lucide="folder-output" class="w-4 h-4"></i> Esporta Sequenza ZIP</button>
           </div>
-          <div class="row">
-            <label class="label" for="seqScale">Scala</label>
-            <select id="seqScale"><option value="1">1×</option><option value="2">2×</option></select>
+
+          <hr class="border-neutral-800">
+
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <label for="webmFps" class="text-sm">FPS Registrazione</label>
+              <input id="webmFps" type="number" min="5" max="60" value="30" class="w-20 bg-transparent border border-neutral-700 rounded-md py-1 px-2 text-sm focus:border-neutral-500 text-right">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="btnWebmStart" class="flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white py-2 rounded-md transition-colors border border-red-600"><i data-lucide="circle-dot" class="w-4 h-4"></i> Start</button>
+              <button id="btnWebmStop" disabled class="flex items-center justify-center gap-2 bg-neutral-800 border border-neutral-700 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><i data-lucide="square" class="w-4 h-4"></i> Stop</button>
+            </div>
           </div>
-          <div class="row"><label><input id="seqOverlayOnly" type="checkbox"> Solo overlay</label></div>
-          <div class="row"><button id="btnSeq">🗂️ Esporta sequenza (ZIP)</button></div>
-          <hr style="border:0;border-top:1px solid var(--line);width:100%">
-          <div class="row">
-            <label class="label" for="webmFps">WebM FPS</label>
-            <input id="webmFps" type="number" min="5" max="60" value="30" style="width:70px">
-          </div>
-          <div class="row"><button id="btnWebmStart">⏺️ Start WebM</button><button id="btnWebmStop" disabled>⏹️ Stop</button></div>
         </div>
       </details>
-    </aside>
+    </div>
+  </aside>
 
-    <main id="stage">
-      <div id="stageToolbar">
-        <div class="left"></div>
-        <div class="right">
-          <span id="infoSource">Sorgente: —</span>
-          <span>•</span>
-          <span id="infoFps">FPS: —</span>
+  <main id="stage" class="flex-1 flex flex-col min-w-0 bg-[#0a0a0a] relative">
+    
+    <div id="stageToolbar" class="h-14 border-b border-neutral-800 bg-[#171717] flex items-center justify-between px-4 z-10">
+      
+      <button id="menuToggleMain" class="md:hidden p-2 -ml-2 hover:bg-neutral-800 rounded-md" onclick="document.getElementById('menuToggle').click()">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex-1 flex items-center justify-end md:justify-between text-xs text-neutral-500 font-mono">
+        <div class="hidden md:flex items-center gap-4">
+          <span class="flex items-center gap-1"><i data-lucide="monitor-play" class="w-3.5 h-3.5"></i> <span id="infoSource">Sorgente: —</span></span>
+          <span>|</span>
+          <span class="flex items-center gap-1"><i data-lucide="activity" class="w-3.5 h-3.5"></i> <span id="infoFps">FPS: —</span></span>
+        </div>
+        
+        <div class="flex items-center gap-3">
+          <div class="md:hidden flex items-center gap-2 text-[10px]">
+             <span id="infoFpsMob" class="hidden"></span>
+          </div>
         </div>
       </div>
-      <div id="canvasWrap" aria-label="Area canvas"></div>
-    </main>
-  </div>
+    </div>
+
+    <div id="canvasWrap" class="flex-1 w-full h-full p-4 md:p-8" aria-label="Area canvas">
+      </div>
+  </main>
 
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <!-- Il tuo JS “funzionante” senza modifiche -->
+  <script>lucide.createIcons();</script>
   <script src="sketch.js"></script>
 </body>
 </html>
